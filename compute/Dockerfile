@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-ARG UBUNTU_VERSION=24.10
-FROM ubuntu:${UBUNTU_VERSION}
+ARG VERSION=24.10
+FROM ubuntu:${VERSION}
 
 # Set time zone
 ARG TIMEZONE="America/Chicago"
@@ -12,11 +12,11 @@ RUN ln -sn /usr/share/zoneinfo/${TIMEZONE} /etc/localtime \
 # Switch the shell to bash
 SHELL ["/usr/bin/bash", "-c"]
 
-# Install Build and Runtime Slurm Development Libraries
+
+# Install Slurm Runtime Deps
 RUN <<EOF
 apt-get update
-packages=(
-    build-essential
+slurm_runtime_deps=(
     libssl-dev
     libbz2-dev
     libnuma-dev
@@ -38,9 +38,7 @@ packages=(
     libpam0g-dev
     liblz4-dev
     libnvidia-ml-dev
-    man2html
     libpmix-dev
-    curl
     python3
     python3-pip
     net-tools
@@ -49,7 +47,7 @@ packages=(
     iputils-ping
     netcat-openbsd
 )
-for package in "${packages[@]}"
+for package in "${slurm_runtime_deps[@]}"
 do
     DEBIAN_FRONTEND=noninteractive apt-get install -y $package
 done
@@ -63,7 +61,7 @@ ARG PASSWORD=${SLURM_USER_PASSWORD:-"slurm"}
 ARG UID=1001
 ARG GID=1001
 
-# Create the user
+# Create the admin user account (slurm)
 RUN <<EOF
 groupadd --gid ${GID} ${USERNAME}
 useradd --uid ${UID} --gid ${GID} -m ${USERNAME}
@@ -74,8 +72,8 @@ echo "${USERNAME} ALL=(ALL) ALL" > /etc/sudoers.d/${USERNAME}
 chmod 0440 /etc/sudoers.d/${USERNAME}
 EOF
 
-# Set the user for the runtime
 USER ${USERNAME}
-WORKDIR "/home/${USERNAME}"
+# Swith the workdir to default directory
+WORKDIR /home/${USERNAME}
 
 ENTRYPOINT ["/usr/bin/bash"]

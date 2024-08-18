@@ -1,1 +1,105 @@
+version: "3.8"
+
 services:
+  # Controller Daemon Node
+  slurmctld:
+    build:
+      context: ./head
+      args:
+        UBUNTU_VERSION: "24.10"
+    image: head-node:v1.0
+    hostname: slurmctld
+    privileged: true # Privileged container for NAT configuration
+    env_file:
+      - "./environments/slurm_user_account.env"
+    tty: true
+    stdin_open: true
+    entrypoint: [ "bash", "/opt/entrypoint.sh" ]
+    expose:
+      - "6817" # Slurmctdl port for communication
+    healthcheck:
+      # Check if TCP port 6817 is open and slurmctld is running
+      test: ["CMD", "nc", "-z", "localhost", "6817"]
+      interval: 3s
+    volumes:
+      - apps:/opt/apps
+      - slurmctld-state:/var/spool/slurmctld
+      - munge-key:/etc/munge
+      - ./configurations/slurm.conf:/etc/slurm/slurm.conf
+      - ./configurations/cgroup.conf:/etc/slurm/cgroup.conf:ro
+      - ./head/entrypoint.sh:/opt/entrypoint.sh
+    networks:
+      management:
+        ipv4_address: 10.0.1.2
+      worker:
+        ipv4_address: 172.16.100.2
+    cpus: 4
+    mem_limit: 4g
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
+  # Compute Node 1
+  cpn01:
+    build:
+      context: ./compute
+      args:
+        UBUNTU_VERSION: "24.10"
+    image: compute-node:v1.0
+    hostname: cpn01
+    privileged: true # Privileged container for NAT configuration
+    env_file:
+      - "./environments/slurm_user_account.env"
+    tty: true
+    stdin_open: true
+    entrypoint: [ "bash", "/opt/entrypoint.sh" ]
+    expose:
+      - "6818" # Slurmd port for communication
+    healthcheck:
+      # Check if TCP port 6818 is open and slurmd is running
+      test: ["CMD", "nc", "-z", "localhost", "6818"]
+      interval: 3s
+    volumes:
+      - apps:/opt/apps:ro
+      - munge-key:/etc/munge
+      - ./compute/entrypoint.sh:/opt/entrypoint.sh:ro
+    networks:
+      worker:
+        ipv4_address: 172.16.100.3
+    depends_on:
+      - slurmctld
+    cpu_count: 2
+    mem_limit: 2g
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
+# Volume Definitions
+volumes:
+  apps:
+    labels:
+      - com.ua.compose.app=slurm-cluster
+  slurmctld-state:
+    labels:
+      - com.ua.compose.app=slurm-cluster
+  munge-key:
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
+# Network Definitions
+networks:
+  management:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.0.1.0/24
+          gateway: 10.0.1.1
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
+  worker:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.100.0/24
+          gateway: 172.16.100.1
+    labels:
+      - com.ua.compose.app=slurm-cluster
