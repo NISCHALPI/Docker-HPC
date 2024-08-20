@@ -1,79 +1,167 @@
 version: "3.8"
 
 services:
+  # OpenLDAP Service for NSS and PAM Authentication
+  openldap:
+    image: bitnami/openldap:2.5-debian-12
+    hostname: openldap
+    # environment:
+    #   - LDAP_CUSTOM_LDIF_DIR=/opt/data/
+    env_file:
+      - "./environments/openldap_config.env"
+    ports:
+      - "1389:1389"
+    healthcheck:
+      # Check if slapd is process is running 
+      test: [ "CMD", "pgrep", "slapd" ]
+      interval: 3s
+    volumes:
+      - openldap-data:/bitnami/openldap
+      - ./data/:/opt/data/
+    networks:
+      management:
+        ipv4_address: 10.0.1.3
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
   # Controller Daemon Node
   slurmctld:
     build:
-      context: ./head
+      context: ./node
       args:
         UBUNTU_VERSION: "24.10"
-    image: head-node:v1.0
+    image: node:ubuntu-v24.10
     hostname: slurmctld
     privileged: true # Privileged container for NAT configuration
     env_file:
-      - "./environments/slurm_user_account.env"
+      - "./environments/slurm.env"
+      - "./environments/ldap.env"
     tty: true
     stdin_open: true
-    entrypoint: [ "bash", "/opt/entrypoint.sh" ]
+    entrypoint: ["bash", "-c", "python3 /opt/scripts/entrypoint.py  && tail -f /dev/null"]
     expose:
       - "6817" # Slurmctdl port for communication
     healthcheck:
       # Check if TCP port 6817 is open and slurmctld is running
-      test: ["CMD", "nc", "-z", "localhost", "6817"]
+      test: [ "CMD", "nc", "-z", "localhost", "6817" ]
       interval: 3s
     volumes:
       - apps:/opt/apps
       - slurmctld-state:/var/spool/slurmctld
       - munge-key:/etc/munge
-      - ./configurations/slurm.conf:/etc/slurm/slurm.conf
+      - home:/home
+      - ./configurations/slurm.conf:/etc/slurm/slurm.conf:ro
       - ./configurations/cgroup.conf:/etc/slurm/cgroup.conf:ro
-      - ./head/entrypoint.sh:/opt/entrypoint.sh
+      - ./scripts/:/opt/scripts/:ro
     networks:
       management:
         ipv4_address: 10.0.1.2
       worker:
         ipv4_address: 172.16.100.2
-    cpus: 4
-    mem_limit: 4g
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
     labels:
       - com.ua.compose.app=slurm-cluster
+    depends_on:
+      - openldap
 
+  # Compute Nodes:(Name must be in the format compute-X)
   # Compute Node 1
-  cpn01:
+  compute-1:
     build:
-      context: ./compute
+      context: ./node
       args:
         UBUNTU_VERSION: "24.10"
-    image: compute-node:v1.0
-    hostname: cpn01
+    image: node:ubuntu-v24.10
+    hostname: compute-1
     privileged: true # Privileged container for NAT configuration
     env_file:
-      - "./environments/slurm_user_account.env"
+      - "./environments/slurm.env"
+      - "./environments/ldap.env"
     tty: true
     stdin_open: true
-    entrypoint: [ "bash", "/opt/entrypoint.sh" ]
+    entrypoint: ["bash", "-c", "python3 /opt/scripts/entrypoint.py  && tail -f /dev/null"]
     expose:
       - "6818" # Slurmd port for communication
     healthcheck:
       # Check if TCP port 6818 is open and slurmd is running
-      test: ["CMD", "nc", "-z", "localhost", "6818"]
+      test: [ "CMD", "nc", "-z", "localhost", "6818" ]
       interval: 3s
     volumes:
       - apps:/opt/apps:ro
       - munge-key:/etc/munge
-      - ./compute/entrypoint.sh:/opt/entrypoint.sh:ro
+      - home:/home
+      - ./scripts/:/opt/scripts/:ro
     networks:
       worker:
         ipv4_address: 172.16.100.3
     depends_on:
       - slurmctld
-    cpu_count: 2
-    mem_limit: 2g
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
     labels:
       - com.ua.compose.app=slurm-cluster
 
-# Volume Definitions
+  # Compute Node 2
+  compute-2:
+    build:
+      context: ./node
+      args:
+        UBUNTU_VERSION: "24.10"
+    image: node:ubuntu-v24.10
+    hostname: compute-2
+    privileged: true # Privileged container for NAT configuration
+    env_file:
+      - "./environments/slurm.env"
+      - "./environments/ldap.env"
+    tty: true
+    stdin_open: true
+    entrypoint: ["bash", "-c", "python3 /opt/scripts/entrypoint.py  && tail -f /dev/null"]
+    expose:
+      - "6818" # Slurmd port for communication
+    healthcheck:
+      # Check if TCP port 6818 is open and slurmd is running
+      test: [ "CMD", "nc", "-z", "localhost", "6818" ]
+      interval: 3s
+    volumes:
+      - apps:/opt/apps:ro
+      - munge-key:/etc/munge
+      - home:/home
+      - ./scripts/:/opt/scripts/:ro
+    networks:
+      worker:
+        ipv4_address: 172.16.100.4
+    depends_on:
+      - slurmctld
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+    labels:
+      - com.ua.compose.app=slurm-cluster
+
+# Volume Definitions for the cluster
+# Apps volume is used to share applications between the controller and compute nodes  (like slurm binaries and libraries)
+# Slurmctld-state volume is used to store the state of the slurm controller
+# Munge-key volume is used to store the munge key for authentication
+# Home volume is used to store the user home directories for persistent storage
+# openldap-data volume is used to store the OpenLDAP data for user authentication and uniform access
 volumes:
+  openldap-data:
+    labels:
+      - com.ua.compose.app=slurm-cluster
   apps:
     labels:
       - com.ua.compose.app=slurm-cluster
@@ -83,8 +171,14 @@ volumes:
   munge-key:
     labels:
       - com.ua.compose.app=slurm-cluster
+  home:
+    labels:
+      - com.ua.compose.app=slurm-cluster
 
 # Network Definitions
+# Two networks are defined for the cluster: management (front-end) and worker (back-end)
+# Controller, Database, and Web services are connected to the management network
+# Compute nodes are connected to the worker network
 networks:
   management:
     driver: bridge

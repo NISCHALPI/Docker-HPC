@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG UBUNTU_VERSION=24.10
 FROM ubuntu:${UBUNTU_VERSION}
-
 # Set time zone
 ARG TIMEZONE="America/Chicago"
 RUN ln -sn /usr/share/zoneinfo/${TIMEZONE} /etc/localtime \
@@ -60,11 +59,15 @@ EOF
 # Slurm User Account
 ARG USERNAME=${SLURM_USER_NAME:-"slurm"}
 ARG PASSWORD=${SLURM_USER_PASSWORD:-"slurm"}
-ARG UID=1001
-ARG GID=1001
+ARG UID=1000
+ARG GID=1000
 
-# Create the user
+# Create the user default user account and remove the ubunut account 
 RUN <<EOF
+if id ubuntu &>/dev/null; then
+    userdel ubuntu
+    groupdel ubuntu
+fi
 groupadd --gid ${GID} ${USERNAME}
 useradd --uid ${UID} --gid ${GID} -m ${USERNAME}
 echo "${USERNAME}:${PASSWORD}" | chpasswd
@@ -79,3 +82,4 @@ USER ${USERNAME}
 WORKDIR "/home/${USERNAME}"
 
 ENTRYPOINT ["/usr/bin/bash"]
+

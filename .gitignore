@@ -6,7 +6,7 @@
 *.pid
 *.seed
 *.pid.lock
-
+*.ignore
 # Ignore local environment files
 .env
 .env.*
