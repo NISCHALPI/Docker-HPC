@@ -1,6 +1,6 @@
 version: 1
 
-## Entry 1: dc=ua-docker-hpc,dc=com
+# Entry for the root DSE
 dn: dc=ua-docker-hpc,dc=com
 dc: ua-docker-hpc
 o: UA Docker HPC
@@ -8,32 +8,14 @@ objectClass: top
 objectClass: dcObject
 objectClass: organization
 
-## Entry 2: cn=slurm,dc=ua-docker-hpc,dc=com
-dn: cn=slurm,dc=ua-docker-hpc,dc=com
-cn: slurm
-description: LDAP administrator
-objectClass: simpleSecurityObject
-objectClass: organizationalRole
-userPassword: slurm
+########### OIT Organizational Unit ############
+dn: ou=oit,dc=ua-docker-hpc,dc=com
+ou: oit
+objectClass: top
+objectClass: organizationalUnit
 
-## Entry 3: cn=slurm,dc=ua-docker-hpc,dc=com
-# dn: cn=slurm,dc=ua-docker-hpc,dc=com
-# cn: slurm
-# gidNumber: 1000
-# givenName: Slurm
-# homeDirectory: /home/slurm
-# loginShell: /bin/bash
-# mail: slurm@ua-docker-hpc.com
-# objectClass: inetOrgPerson
-# objectClass: posixAccount
-# objectClass: top
-# sn: Slurm
-# uid: slurm
-# uidNumber: 1000
-# userPassword: slurm
-
-## Entry 4: cn=nbhattarai,dc=ua-docker-hpc,dc=com
-dn: cn=nbhattarai,dc=ua-docker-hpc,dc=com
+########### OIT Team Members ############
+dn: cn=nbhattarai,ou=oit,dc=ua-docker-hpc,dc=com
 cn: nbhattarai
 gidNumber: 1002
 givenName: Nischal
@@ -48,27 +30,25 @@ uid: nbhattarai
 uidNumber: 1002
 userPassword: nbhattarai
 
-## Entry 5: cn=djay,dc=ua-docker-hpc,dc=com
-dn: cn=djay,dc=ua-docker-hpc,dc=com
+dn: cn=djay,ou=oit,dc=ua-docker-hpc,dc=com
 cn: djay
 gidNumber: 1003
-givenName: David
+givenName: Djay
 homeDirectory: /home/djay
 loginShell: /bin/bash
 mail: djay@ua-docker-hpc.com
 objectClass: inetOrgPerson
 objectClass: posixAccount
 objectClass: top
-sn: Jay
+sn: Cervino
 uid: djay
 uidNumber: 1003
 userPassword: djay
 
-## Entry 6: cn=radkins,dc=ua-docker-hpc,dc=com
-dn: cn=radkins,dc=ua-docker-hpc,dc=com
+dn: cn=radkins,ou=oit,dc=ua-docker-hpc,dc=com
 cn: radkins
 gidNumber: 1004
-givenName: Robert
+givenName: Richard
 homeDirectory: /home/radkins
 loginShell: /bin/bash
 mail: radkins@ua-docker-hpc.com
@@ -80,11 +60,10 @@ uid: radkins
 uidNumber: 1004
 userPassword: radkins
 
-## Entry 7: cn=rgriffin,dc=ua-docker-hpc,dc=com
-dn: cn=rgriffin,dc=ua-docker-hpc,dc=com
+dn: cn=rgriffin,ou=oit,dc=ua-docker-hpc,dc=com
 cn: rgriffin
 gidNumber: 1005
-givenName: Rachel
+givenName: Robert
 homeDirectory: /home/rgriffin
 loginShell: /bin/bash
 mail: rgriffin@ua-docker-hpc.com
@@ -96,11 +75,10 @@ uid: rgriffin
 uidNumber: 1005
 userPassword: rgriffin
 
-## Entry 8: cn=dcrocker,dc=ua-docker-hpc,dc=com
-dn: cn=dcrocker,dc=ua-docker-hpc,dc=com
+dn: cn=dcrocker,ou=oit,dc=ua-docker-hpc,dc=com
 cn: dcrocker
 gidNumber: 1006
-givenName: Daniel
+givenName: Deborah
 homeDirectory: /home/dcrocker
 loginShell: /bin/bash
 mail: dcrocker@ua-docker-hpc.com
