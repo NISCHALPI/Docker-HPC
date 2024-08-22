@@ -26,7 +26,7 @@ def get_logger(name: str, dummy: bool = False) -> logging.Logger:
     logger.handlers = []  # Remove any existing handlers
 
     # Set format for logs
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(" %(levelname)s : %(asctime)s : %(message)s")
 
     if dummy:
         # Create a dummy logger that logs to a NullHandler

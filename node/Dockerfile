@@ -47,6 +47,7 @@ packages=(
     iptables
     iputils-ping
     netcat-openbsd
+    sssd
 )
 for package in "${packages[@]}"
 do
@@ -77,9 +78,9 @@ echo "${USERNAME} ALL=(ALL) ALL" > /etc/sudoers.d/${USERNAME}
 chmod 0440 /etc/sudoers.d/${USERNAME}
 EOF
 
-# Set the user for the runtime
-USER ${USERNAME}
-WORKDIR "/home/${USERNAME}"
+# # Set the user for the runtime
+# USER ${USERNAME}
+# WORKDIR "/home/${USERNAME}"
 
 ENTRYPOINT ["/usr/bin/bash"]
 

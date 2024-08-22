@@ -10,7 +10,7 @@
 # Ignore local environment files
 .env
 .env.*
-
+*.ipynb
 # Ignore compiled code or build artifacts
 *.o
 *.out

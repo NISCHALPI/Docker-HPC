@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-from utils import run, get_env_var, check_port_open, get_hostname
+from deb_utils import get_env_var, check_port_open, get_hostname, set_uid_root
 from logger import get_logger
 from pathlib import Path
 import time
+import subprocess
 
 logger = get_logger(__name__)
 
@@ -26,12 +27,12 @@ def create_dirs_with_permissions(dirs: list, uname: str) -> None:
         # If the directory does not exist, create it
         if not Path(dir).exists():
             # Create the directory
-            run(f"mkdir -p {dir}")
+            subprocess.run(["mkdir", "-p", dir])
 
         # Change the ownership of the directory
-        run(f"chown -R {uname}:{uname} {dir}")
+        subprocess.run(["chown", "-R", f"{uname}:{uname}", dir])
         # Set 700 permission
-        run(f"chmod 700 {dir}")
+        subprocess.run(["chmod", "700", dir])
         logger.info(f"Created directory: {dir} with permissions 700")
 
 
@@ -59,9 +60,23 @@ def start_slurm_daemons(prefix: Path) -> None:
         create_dirs_with_permissions(SLURMCTLD_DIRS, SLURM_USER_NAME)
 
         logger.info("Starting the slurmctld daemon!")
-        # Run the controller daemon as slurm user (i.e entrypoint user)
-        run(
-            f"{prefix}/sbin/slurmctld -D -vvv -c  -f {SLURM_CONFIG_FILE}", with_super_user=False  
+        # Check if LDAP server is running
+        LDAP_SERVER_ADDRESS = get_env_var("LDAP_SERVER_ADDRESS")
+        LDAP_SERVER_PORT = get_env_var("LDAP_SERVER_PORT")
+        check_port_open(LDAP_SERVER_ADDRESS, LDAP_SERVER_PORT)
+        # Run the controller daemon as slurm user (i.e entrypoint user)q
+        subprocess.run(
+            [
+                "sudo",
+                "-u",
+                SLURM_USER_NAME,
+                f"{prefix}/sbin/slurmctld",
+                "-D",
+                "-vvv",
+                "-c",
+                "-f",
+                SLURM_CONFIG_FILE,
+            ]
         )
 
     elif hostname.startswith("compute"):
@@ -78,12 +93,20 @@ def start_slurm_daemons(prefix: Path) -> None:
             )
             time.sleep(1)
 
-        # Run the slurmd daemon as root user
-        run(
-            f"{prefix}/sbin/slurmd -cDvvv --conf-server {SLURM_CTDL_WORKER_IP}:{SLURM_CTDL_PORT}"
+        # Run the slurmd daemon as root user (uid=0)
+        subprocess.run(
+            [
+                f"{prefix}/sbin/slurmd",
+                "-c",
+                "-D",
+                "-vvv",
+                "--conf-server",
+                f"{SLURM_CTDL_WORKER_IP}:{SLURM_CTDL_PORT}",
+            ]
         )
 
 
 if __name__ == "__main__":
+    set_uid_root()
     SLURM_INSTALL_PREFIX = get_env_var("SLURM_INSTALL_PREFIX")
     start_slurm_daemons(Path(SLURM_INSTALL_PREFIX))

@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
-from utils import run, get_env_var, get_hostname
+from deb_utils import (
+    get_env_var,
+    get_hostname,
+    non_interactive_install,
+    clear_apt_caches,
+    set_uid_root,
+)
 from logger import get_logger
+import subprocess
+
 
 logger = get_logger("__name__")
 
@@ -13,13 +21,6 @@ NETWORKING_DEPS = [
 ]
 
 
-def install_networking_deps() -> None:
-    """Installs the networking dependencies"""
-    for dep in NETWORKING_DEPS:
-        logger.info(f"Installing networking dependency: {dep}")
-        run(f"DEBIAN_FRONTEND=noninteractive apt-get install -y {dep}")
-
-
 def setup_network() -> None:
     """Sets up the network topology for the HPC cluster"""
     # Define the IP on the worker network of the slurmctld node (See compose file)
@@ -28,16 +29,39 @@ def setup_network() -> None:
     hostname = get_hostname()
 
     # Install the networking dependencies
-    install_networking_deps()
+    logger.info("Installing networking dependencies")
+    for dep in NETWORKING_DEPS:
+        non_interactive_install(dep)
+    logger.info("Networking dependencies installed")
+
+    logger.info("Clearing the apt caches")
+    clear_apt_caches()
+    logger.info("Apt caches cleared")
 
     # If the hostname is the slurmctld node, then we neet to set up NAT on eth0 to eth1 which is on the worker network
     if hostname.startswith("slurmctld"):
         logger.info("Setting up NAT for all traffic on eth0(gateway) on slurmctld node")
-        run("sysctl -w net.ipv4.ip_forward=1")
-        run("iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
+        subprocess.run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
+        subprocess.run(
+            [
+                "iptables",
+                "-t",
+                "nat",
+                "-A",
+                "POSTROUTING",
+                "-o",
+                "eth0",
+                "-j",
+                "MASQUERADE",
+            ]
+        )
         logger.info("Setting up forwarding rules for eth0 <--> eth1")
-        run("iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT")
-        run("iptables -A FORWARD -i eth0 -o eth1 -j ACCEPT")
+        subprocess.run(
+            ["iptables", "-A", "FORWARD", "-i", "eth1", "-o", "eth0", "-j", "ACCEPT"]
+        )
+        subprocess.run(
+            ["iptables", "-A", "FORWARD", "-i", "eth0", "-o", "eth1", "-j", "ACCEPT"]
+        )
 
         logger.info(
             """NAT forwarding setup complete on the slurmctld node. 
@@ -48,15 +72,17 @@ def setup_network() -> None:
         )
     elif hostname.startswith("compute"):
         logger.info("Setting up default route to slurmctld node")
-        # Remove the default route
-        run("ip route del default")
-        # Add the default route to the slurmctld node
-        run(f"ip route add default via {SLURMCTDL_IP}")
+
+        subprocess.run(["ip", "route", "del", "default"])
+        subprocess.run(["ip", "route", "add", "default", "via", SLURMCTDL_IP])
 
         logger.info(
             f"{hostname} is now configured to route all outgoing traffic to {SLURMCTDL_IP}"
         )
+    else:
+        logger.error(f"Unknown hostname: {hostname}. Cannot setup network topology!")
 
 
 if __name__ == "__main__":
+    set_uid_root()
     setup_network()
