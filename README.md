@@ -3,7 +3,7 @@
 </p>
 
 # Docker HPC Cluster
-The Docker HPC Cluster project, developed by the Center for Research Computing at The University of Alabama at Tuscaloosa, offers a straightforward method for setting up a distributed HPC cluster on a single machine. Utilizing Docker Compose, this repository configures a distributed HPC environment featuring a three-node system, a shared filesystem, and an LDAP server for centralized authentication. It is intended for HPC software development, testing, and pre-production deployment. Moreover, this setup is ideal for educational settings, enabling students from diverse backgrounds to explore HPC system operations, learn about job scheduling, and manage distributed systems on their own laptops or desktops.
+The Docker HPC Cluster project, developed by the Center for Research Computing at The University of Alabama at Tuscaloosa, offers a straightforward method for setting up a prototype distributed HPC. Utilizing Docker Compose, this repository configures a distributed HPC environment featuring a three-node system, a shared filesystem, and an [openLDAP](https://www.openldap.org/) server for centralized authentication. It is intended for HPC software development, testing and experimentation. Moreover, this setup is ideal for educational settings, enabling students from diverse backgrounds to explore HPC system operations, learn about job scheduling, and manage distributed systems in a controlled environment. The cluster is designed to be scalable, allowing users to add more compute nodes, storage, and services as needed.
 
 
 ## Installation and Usage
@@ -25,10 +25,9 @@ dockercluster-compute-2-1   node:ubuntu-v24.10               compute-2          
 dockercluster-openldap-1    bitnami/openldap:2.5-debian-12   openldap            7 minutes ago       Up 7 minutes (healthy)   
 dockercluster-slurmctld-1   node:ubuntu-v24.10               slurmctld           7 minutes ago       Up 7 minutes (healthy)   
 ```
-**Note: On the initial run, it may take a few minutes to set up the daemons. You can check the container status to monitor their health. The containers are considered healthy once all daemons are up and running. Please be patient and refrain from submitting jobs until all nodes are fully operational and all health checks have passed.**
+**Note: On the initial run, it may take a few minutes to set up the daemons since SLURM is compiled and installed in a NFS fashion. You can check the container status to monitor their health. The containers are considered healthy once all daemons are up and running. Please be patient and refrain from submitting jobs until all health checks have passed.**
 
-If you want to see the logs of the containers, you can run the following command. 
-
+If you want to see the logs of the containers mainly daemons logs, you can run the following command. 
 ```bash
 docker compose logs -f
 ```
@@ -38,29 +37,32 @@ If you want to stop the cluster, you can run the following command.
 ```bash
 docker compose down
 ```
-This will stop the cluster and remove the containers. If you want to remove the containers, volumes, and networks, you can run the following command.
-
+This will stop the cluster and remove the containers. However, the volumes and networks will still be there for data persistence  for another run.
+If you want to remove the containers, volumes, and networks, you can run the following command.
 ```bash
 docker compose down -v  --rmi all
 ```
-**Note: This will remove all the containers, volumes, and networks i.e all the persistent data will be lost. Remove -v if you want to keep the volumes.**
+**Note: This will remove all the containers, volumes, and networks i.e all the persistent data will be lost. Do not use -v if you want to keep the volumes.**
 
 ## Cluster Topology and Networks
 The diagram below illustrates the cluster topology, including the networks and the shared filesystem.
 <p align="center">
-  <img src="./data/topology.png" alt="Cluster Topology" style="background-color: #f5f5f3;"/>
+  <img src="./data/topology.png" alt="Cluster Topology" style="background-color: #ffffff;"/>
+  <br/>
+  <span style="display: block; font-size: 1.1em; margin-top: 5px;">Figure 1: Cluster Topology and Networks</span>
 </p>
-The purple nodes represent the compute nodes, the cyan node indicates the LDAP server, and the light blue node shows the SLURM controller. The cluster operates on two distinct networks: the management network and the compute network. The home directory, apps directory, and optionally, Auth DB data are stored in the persistant filesystem provided by the Docker volume. The worker network is isolated from the internet, with outgoing traffic routed through the head node, where it is NATed to the internet. This setup creates a single entry point to the cluster and enables traffic monitoring. 
+
+The purple nodes represent the compute nodes, the cyan node indicates the LDAP server, and the light blue node shows the SLURM controller. The cluster operates on two distinct networks: the management network and the compute network. The home directory, apps directory, and optionally, Auth DB data are stored in the persistant filesystem provided by the Docker volume. The worker network is isolated from the internet, with outgoing traffic routed through the head node, where it is NATed to the internet. This setup creates a single entry point to the cluster and enables traffic monitoring. The topology is reflected in the [docker-compose.yml](docker-compose.yml) file, which defines the services, networks, and volumes used in the cluster.
 
 ## Daemons and Shared Filesystem
 The `slurmctld` daemon, running within the `slurmctld` container, manages the compute nodes, schedules jobs, and monitors the cluster. Meanwhile, the `slurmd` daemon, operating on the compute nodes, is responsible for executing jobs. The shared filesystem, which includes the home and apps directories, is mounted across all compute nodes. This setup ensures that any software installed in the apps directory, along with its dependencies, is available on all compute nodes, utilizing the same shared libraries. For this to function correctly, the software must be built against the same OS and architecture, which is valid in this case, as all nodes run the same OS and architecture.
 
 ## The LDAP Authentication Server
-To run SLURM, a uniform UID and GID must be maintained across all nodes. This is accomplished using an LDAP server, which provides centralized authentication. The LDAP server is configured using the settings in the `/environments/ldap.env` file before the container is started. It is not recommended to modify the LDAP configuration. If changes are necessary, you must also update the `/configurations` directory and the `/scripts` directory to reflect the adjustments in the configuration files and  startup scripts. The LDAP server is initialized with the entries specified in the `/data/bootstrap.ldif` file, and `sssd` is used to manage authentication.
+To run SLURM, a uniform UID and GID must be maintained across all nodes. This is accomplished using an LDAP server, which provides centralized authentication. The LDAP server is configured using the settings in the [ldap.env](/environments/ldap.env) file before the container is started. It is not recommended to modify the LDAP configuration. If changes are necessary, you must also update the sssd [config](/configurations/sssd.conf) file, startup [scripts](/scripts/), and [env_files](/environments/) to reflect the adjustments propelry. The LDAP server is initialized with the entries specified in the [bootstrap](/data/bootstrap.ldif) ldif file, and [sssd](https://sssd.io/) is used to manage authentication.
 
 
 ## Job Submission
-The cluster is configured to accept job submissions from the head (slurmctld) node. To submit a job, you must first log in to the head node. Use the user account in the 'bootstrap.ldif' file to log in  or use the slurm admin account defined in '/environments/slurm.env'. To log in, use the following command after the containers are healthy and running.
+The cluster is configured to accept job submissions from the head (slurmctld) node. To submit a job, you must first log in to the head node. Use the user account in the 'bootstrap.ldif' file to log in  or use the slurm admin account defined in [slurm.env]('/environments/slurm.env'). To log in, use the following command after the containers are healthy and running.
 ```bash
 docker compose exec slurmctld login <username>
 ```
@@ -75,7 +77,7 @@ hello world from compute-2
 ```
 
 ## Scripts and Configuration Files
-The entrypoint scripts and configuration files are stored in the `/scripts` and `/configurations` directories, respectively. The scripts handle the configuration of the LDAP server, setup of the shared filesystem, installation of SLURM, and synchronized startup of the daemons. Written in Python, the scripts are easy to read and modify. Developers can adjust these scripts to observe their effects, enhance functionality, or troubleshoot the system. The configuration files are utilized by the scripts to set up the services. Developers can edit these files to alter the behavior of the services.
+The entrypoint scripts and configuration files are stored in the [scripts](/scripts) and [configurations](/configurations) directories, respectively. The scripts handle the configuration of the LDAP server, setup of the shared filesystem, installation of SLURM, and synchronized startup of the daemons. Written in Python, the scripts are easy to read and modify. Developers can adjust these scripts to observe their effects, enhance functionality, or troubleshoot the system. The configuration files are utilized by the scripts to set up the services. Developers can edit these files to alter the behavior of the services.
 
 
 ## Use Cases and Applications

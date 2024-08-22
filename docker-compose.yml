@@ -16,7 +16,7 @@ services:
       test: [ "CMD", "pgrep", "slapd" ]
       interval: 3s
     volumes:
-      # - openldap-data:/bitnami/openldap
+      # - openldap-data:/bitnami/openldap (for persistent data if not using bootstrap.ldif. Bootstrap script will load the data on every restart)
       - ./data/:/opt/data/
     networks:
       management:
